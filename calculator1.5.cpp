@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <string>
 #include <vector>
 #include <cctype>
@@ -9,11 +9,7 @@
 #include <unordered_set>
 #include <sstream>
 #include <array>
-#ifndef NDEBUG  
-#define log(x) std::cerr << x << std::endl;  
-#else  
-#define log(x) ((void)0)  
-#endif
+#include "log.h"
 using namespace std;
 // 定义计算器类
 class calculator {
@@ -22,17 +18,17 @@ public:
 
     calculator() {}; // 默认构造函数
     // 带有一个字符串参数的构造函数，用于初始化表达式
-    calculator(std::string a) {
-        expression = a;
-    }
+    calculator(std::string a) :expression(a){}
     inline ~calculator() {}; // 析构函数
 
     // 计算表达式的函数
     bool evaluate(std::string& a) {
         // 检查表达式的首尾字符是否为数字
+        string error;
         if (!isdigit(expression[0]) || !isdigit(expression[expression.size() - 1])) {
             if (expression[0] != '(' && expression[expression.size() - 1] != ')') {
-                std::cerr << "错误：第一个字符和最后一个字符不能是运算符。";
+                error = "错误：第一个字符和最后一个字符不能是运算符。";
+                log(error, 2);
                 return true;
             }
         }
@@ -40,12 +36,16 @@ public:
         // 检查表达式中是否含有非法字符
         for (char i : expression) {
             if (find(pass_str.begin(), pass_str.end(), i) == pass_str.end()) {
-                std::cerr << "错误：没有叫“" << i << "”的运算符。";
+                stringstream ss;
+                ss << "错误：没有叫“" << i << "”的运算符。";
+                error = ss.str();
+                log(error, 2);
                 return true;
             }
         }
         if (!isValid(expression)) {
-            std::cerr << "错误：未闭合的括号。";
+            error = "警告：未闭合的括号。";
+            log(error, 1);
             return true;
         }
         std::stack<char> op_stack; // 操作符栈  
@@ -74,7 +74,8 @@ public:
                     value.push(output); // 将计算结果入栈  
                 }
                 catch (std::runtime_error err) {
-                    std::cout << err.what();
+                    error = err.what();
+                    log(error, 1);
                     return true;
                 }
             }
@@ -100,36 +101,16 @@ private:
         }return ExStack.empty();
     }
     inline bool isnum(const std::string& a) const {
-        // 允许数字字符串以小数点开头（例如 ".5"），但后续必须跟数字  
-        bool has_decimal = false;
-        for (char i : a) {
-            if (isdigit(i)) {
-                return true; // 只要有一个数字就返回 true  
-            }
-            else if (i == '.' && !has_decimal) {
-                has_decimal = true; // 只允许一个小数点，并且不能是字符串的最后一个字符  
-                if (a.size() == 1) return false; // 单个小数点不是数字  
-            }
-            else {
-                return false; // 其他字符都不是数字  
-            }
+        try {
+            int b = stod(a);
         }
-        return has_decimal; // 如果字符串仅包含一个小数点（例如"."），则返回 false  
-    }
-    inline std::vector<std::string> split(std::string a) {
-        std::stringstream iss(a);
-        std::vector<std::string> out;
-        std::string cache;
-        while (iss >> cache) {
-            out.push_back(cache);
-        }return out;
+        catch (invalid_argument err) {
+            return false;
+        }catch (out_of_range err) {
+            return false;
+        }return true;
     }
     std::string expression; // 存储表达式的成员变量
-    inline std::string plus(std::initializer_list<std::string> add_list) {
-        std::string answer;
-        for (const std::string& i : add_list) { for (const char& j : i) { answer += j; } }
-        return answer;
-    }
 
     // 执行计算操作的函数
     inline double apply_op(double a, string op, double b) const {
@@ -137,7 +118,7 @@ private:
         if (op == "-") { return a - b; }
         if (op == "*") { return a * b; }
         if (op == "/") {
-            if (b == 0.0) { throw std::runtime_error("你不能除以零。"); }
+            if (b == 0.0) { throw std::runtime_error("警告：你不能除以零。"); }
             else { return a / b; }
         }
     }
@@ -199,7 +180,7 @@ private:
 int main() {
     // 输出欢迎信息
     std::cout << "欢迎使用计算器！" << std::endl;
-    std::cout << "版本号：V1.1.7" << std::endl;
+    std::cout << "版本号：V1.1.9" << std::endl;
     std::string a;
     while (true) {
         // 提示用户输入表达式
@@ -215,7 +196,8 @@ int main() {
             std::cout << "V1.1.2：优化错误提示，更适合中国人使用" << std::endl;
             std::cout << "V1.1.5：支持多位数和小括号" << std::endl;
             std::cout << "V1.1.7：支持浮点数" << std::endl;
-            std::cout << "V1.1.9（最新版）：增加日志输出，更新历史，未闭合的括号错误提示" << std::endl;
+            std::cout << "V1.1.9：增加日志输出，更新历史，未闭合的括号错误提示" << std::endl;
+            std::cout << "V1.1.92（最新版）:优化代码并优化输出日志，支持带颜色的输出" << std::endl;
             std::cout << "V2.0.1：尽请期待" << std::endl;
             continue;
         }
@@ -223,12 +205,14 @@ int main() {
         std::unique_ptr<calculator> c = std::make_unique<calculator>(a);
         std::string b;
         if (c->evaluate(b)) {
-            std::cout << "请重新输入。" << std::endl;
             continue;
         }
         else {
-            log(b);
+#ifndef NDEBUG
+            log(b, 0);
+#endif
             std::cout << "答案:" << c->output << std::endl;
         }
     }
 }
+
